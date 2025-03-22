@@ -1,0 +1,563 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vSAN ESA Handy Sizer</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Nunito', sans-serif; background-color: #f5f6f5; margin: 0; padding: 1.5rem; min-height: 100vh; display: flex; justify-content: center; align-items: center; overflow: auto; color: #2f353a; }
+        .container { background: #fff; width: 100%; max-width: 1400px; min-height: calc(100vh - 3rem); display: flex; flex-direction: column; box-shadow: 0 0.25rem 0.5rem rgba(47, 53, 58, 0.1); border-radius: 0.5rem; overflow: hidden; }
+        .header { background: #ebedef; padding: 1.5rem; text-align: center; border-bottom: 1px solid #d2d4d6; position: relative; }
+        .header h1 { font-size: 1.75rem; font-weight: 700; margin: 0; color: #2f353a; }
+        .help-icon, .log-icon { position: absolute; top: 1.5rem; font-size: 1.5rem; cursor: pointer; color: #3b82f6; }
+        .help-icon { right: 1.5rem; }
+        .log-icon { right: 3.5rem; }
+        .main-content { flex: 1; display: flex; padding: 1.5rem; gap: 1.5rem; flex-wrap: wrap; }
+        .card { background: #f9fafb; padding: 1.5rem; border-radius: 0.5rem; box-shadow: 0 0.125rem 0.25rem rgba(47, 53, 58, 0.075); }
+        .input-panel { width: 300px; overflow-y: auto; max-height: calc(100vh - 6rem); flex-shrink: 0; }
+        .output-panel { flex: 1; display: flex; flex-direction: column; gap: 1.5rem; min-width: 300px; }
+        .chart-section { display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; }
+        .results-utilization { display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; }
+        .chart-container { max-width: 300px; max-height: 300px; width: 100%; }
+        .results-section, .progress-section { min-width: 250px; max-width: 350px; }
+        .license-section { max-width: 400px; align-self: center; border: 2px solid #ff6b6b; background: #ffebeb; animation: blink 2s infinite; }
+        h2 { font-size: 1.25rem; font-weight: 700; color: #2f353a; margin-bottom: 1rem; }
+        label { font-size: 0.9rem; font-weight: 600; color: #697077; display: inline; margin-right: 0.5rem; }
+        .slider-container { margin: 0.75rem 0; }
+        .label-value-container { display: flex; align-items: center; margin-bottom: 0.25rem; }
+        .slider-control { display: flex; align-items: center; gap: 0.5rem; }
+        input[type="range"] { flex: 1; accent-color: #3b82f6; }
+        .slider-btn { width: 1.5rem; height: 1.5rem; background: #ebedef; border: 1px solid #d2d4d6; border-radius: 0.25rem; font-size: 1rem; font-weight: 600; color: #2f353a; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+        .slider-btn:hover { background: #d2d4d6; }
+        .slider-btn:disabled { background: #f5f6f5; color: #697077; cursor: not-allowed; }
+        select { width: 100%; padding: 0.4rem 0.8rem; border: 1px solid #d2d4d6; border-radius: 0.375rem; background: #fff; color: #2f353a; font-size: 0.9rem; font-weight: 500; margin: 0.75rem 0; }
+        input:focus, select:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25); }
+        .slider-value { font-size: 1rem; font-weight: 500; color: #2f353a; background: #ebedef; padding: 0.25rem 0.5rem; border-radius: 0.25rem; display: inline-block; }
+        .progress-bar { width: 100%; height: 1rem; background: #ebedef; border-radius: 0.375rem; overflow: hidden; margin: 0.25rem 0; position: relative; }
+        .progress-fill { height: 100%; background: #3b82f6; transition: width 0.5s ease; }
+        .progress-label { font-size: 0.9rem; font-weight: 600; color: #2f353a; }
+        .result-text { font-size: 0.9rem; font-weight: 600; color: #2f353a; margin: 0.5rem 0; }
+        .warning { color: #dc2626; font-weight: 700; }
+        .license-section p { font-size: 0.9rem; font-weight: 600; color: #2f353a; margin: 0; }
+        .tooltip { visibility: hidden; background: #2f353a; color: #fff; font-size: 0.8rem; padding: 0.5rem; border-radius: 0.25rem; position: absolute; z-index: 1; bottom: 125%; left: 50%; transform: translateX(-50%); white-space: pre-wrap; }
+        .progress-bar:hover .tooltip { visibility: visible; }
+        .help-card, .log-card { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; padding: 1.5rem; border-radius: 0.5rem; box-shadow: 0 0.25rem 0.5rem rgba(47, 53, 58, 0.3); max-width: 500px; z-index: 1000; }
+        .help-card h3, .log-card h3 { font-size: 1.5rem; font-weight: 700; color: #2f353a; margin-bottom: 1rem; }
+        .help-card ol, .log-card pre { font-size: 0.9rem; font-weight: 500; color: #2f353a; padding-left: 1.5rem; }
+        .log-card pre { padding: 0; white-space: pre-wrap; }
+        .help-card button, .log-card button { margin-top: 1rem; padding: 0.5rem 1rem; background: #3b82f6; color: #fff; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.9rem; font-weight: 600; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+        @media (max-width: 768px) { .main-content { flex-direction: column; padding: 1rem; } .input-panel { width: 100%; max-width: 100%; } .results-utilization { flex-direction: column; align-items: center; } }
+        @media (min-width: 960px) { .input-panel { overflow-x: hidden; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>vSAN ESA Handy Sizer</h1>
+            <span class="log-icon" onclick="toggleLog()">📋</span>
+            <span class="help-icon" onclick="toggleHelp()">?</span>
+        </div>
+        <div class="main-content">
+            <div class="card input-panel">
+                <h2>Configure Your Cluster</h2>
+                <div class="slider-container">
+                    <div class="label-value-container">
+                        <label>Number of VMs</label>
+                        <span id="numVMsValue" class="slider-value">500</span>
+                    </div>
+                    <div class="slider-control">
+                        <button class="slider-btn" onclick="adjustSlider('numVMs', -1)">−</button>
+                        <input type="range" id="numVMs" min="1" max="10000" value="500" oninput="updateSliderValue('numVMs'); calculateSizing()">
+                        <button class="slider-btn" onclick="adjustSlider('numVMs', 1)">+</button>
+                    </div>
+                </div>
+                <div class="slider-container">
+                    <div class="label-value-container">
+                        <label>IOPS per VM</label>
+                        <span id="iopsPerVMValue" class="slider-value">500</span>
+                    </div>
+                    <div class="slider-control">
+                        <button class="slider-btn" onclick="adjustSlider('iopsPerVM', -1)">−</button>
+                        <input type="range" id="iopsPerVM" min="1" max="1000" value="500" oninput="updateSliderValue('iopsPerVM'); calculateSizing()">
+                        <button class="slider-btn" onclick="adjustSlider('iopsPerVM', 1)">+</button>
+                    </div>
+                </div>
+                <div class="slider-container">
+                    <div class="label-value-container">
+                        <label>vCPU per VM</label>
+                        <span id="vcpuPerVMValue" class="slider-value">2</span>
+                    </div>
+                    <div class="slider-control">
+                        <button class="slider-btn" onclick="adjustSlider('vcpuPerVM', -1)">−</button>
+                        <input type="range" id="vcpuPerVM" min="1" max="32" value="2" oninput="updateSliderValue('vcpuPerVM'); calculateSizing()">
+                        <button class="slider-btn" onclick="adjustSlider('vcpuPerVM', 1)">+</button>
+                    </div>
+                </div>
+                <div class="slider-container">
+                    <div class="label-value-container">
+                        <label>Memory per VM (GB)</label>
+                        <span id="memoryPerVMValue" class="slider-value">4</span>
+                    </div>
+                    <div class="slider-control">
+                        <button class="slider-btn" onclick="adjustSlider('memoryPerVM', -1)">−</button>
+                        <input type="range" id="memoryPerVM" min="1" max="128" value="4" oninput="updateSliderValue('memoryPerVM'); calculateSizing()">
+                        <button class="slider-btn" onclick="adjustSlider('memoryPerVM', 1)">+</button>
+                    </div>
+                </div>
+                <div class="slider-container">
+                    <div class="label-value-container">
+                        <label>Used Capacity per VM (GB)</label>
+                        <span id="capacityPerVMValue" class="slider-value">200</span>
+                    </div>
+                    <div class="slider-control">
+                        <button class="slider-btn" onclick="adjustSlider('capacityPerVM', -1)">−</button>
+                        <input type="range" id="capacityPerVM" min="1" max="1024" value="200" oninput="updateSliderValue('capacityPerVM'); calculateSizing()">
+                        <button class="slider-btn" onclick="adjustSlider('capacityPerVM', 1)">+</button>
+                    </div>
+                </div>
+                <div class="slider-container">
+                    <div class="label-value-container">
+                        <label>Number of Hosts</label>
+                        <span id="numHostsValue" class="slider-value">7</span>
+                    </div>
+                    <div class="slider-control">
+                        <button class="slider-btn" onclick="adjustSlider('numHosts', -1)">−</button>
+                        <input type="range" id="numHosts" min="3" max="64" value="7" oninput="updateSliderValue('numHosts'); calculateSizing()">
+                        <button class="slider-btn" onclick="adjustSlider('numHosts', 1)">+</button>
+                    </div>
+                </div>
+                <div class="slider-container">
+                    <div class="label-value-container">
+                        <label>Cores per Socket</label>
+                        <span id="coresPerSocketValue" class="slider-value">28</span>
+                    </div>
+                    <div class="slider-control">
+                        <button class="slider-btn" onclick="adjustSlider('coresPerSocket', -1)">−</button>
+                        <input type="range" id="coresPerSocket" min="1" max="64" value="28" oninput="updateSliderValue('coresPerSocket'); calculateSizing()">
+                        <button class="slider-btn" onclick="adjustSlider('coresPerSocket', 1)">+</button>
+                    </div>
+                </div>
+                <div class="slider-container">
+                    <div class="label-value-container">
+                        <label>Sockets per Host</label>
+                        <span id="socketsPerHostValue" class="slider-value">2</span>
+                    </div>
+                    <div class="slider-control">
+                        <button class="slider-btn" onclick="adjustSlider('socketsPerHost', -1)">−</button>
+                        <input type="range" id="socketsPerHost" min="1" max="4" value="2" oninput="updateSliderValue('socketsPerHost'); calculateSizing()">
+                        <button class="slider-btn" onclick="adjustSlider('socketsPerHost', 1)">+</button>
+                    </div>
+                </div>
+                <div class="slider-container">
+                    <div class="label-value-container">
+                        <label>Max Memory per Host (GB)</label>
+                        <span id="maxMemoryValue" class="slider-value">768</span>
+                    </div>
+                    <div class="slider-control">
+                        <button class="slider-btn" onclick="adjustSlider('maxMemory', -1)">−</button>
+                        <input type="range" id="maxMemory" min="64" max="2048" value="768" oninput="updateSliderValue('maxMemory'); calculateSizing()">
+                        <button class="slider-btn" onclick="adjustSlider('maxMemory', 1)">+</button>
+                    </div>
+                </div>
+                <label>Drive Capacity (TB)</label>
+                <select id="driveCapacity" onchange="calculateSizing()">
+                    <option value="1.6">1.6 TB</option>
+                    <option value="1.92">1.92 TB</option>
+                    <option value="3.2">3.2 TB</option>
+                    <option value="3.84">3.84 TB</option>
+                    <option value="6.4" selected>6.4 TB</option>
+                    <option value="7.62">7.62 TB</option>
+                    <option value="7.68">7.68 TB</option>
+                    <option value="12.8">12.8 TB</option>
+                    <option value="15.36">15.36 TB</option>
+                </select>
+                <div class="slider-container">
+                    <div class="label-value-container">
+                        <label>Max Drive Slots</label>
+                        <span id="maxDriveSlotsValue" class="slider-value">7</span>
+                    </div>
+                    <div class="slider-control">
+                        <button class="slider-btn" onclick="adjustSlider('maxDriveSlots', -1)">−</button>
+                        <input type="range" id="maxDriveSlots" min="1" max="24" value="7" oninput="updateSliderValue('maxDriveSlots'); calculateSizing()">
+                        <button class="slider-btn" onclick="adjustSlider('maxDriveSlots', 1)">+</button>
+                    </div>
+                </div>
+                <div class="slider-container">
+                    <div class="label-value-container">
+                        <label>Compression Ratio</label>
+                        <span id="compressionRatioValue" class="slider-value">1.4</span>
+                    </div>
+                    <div class="slider-control">
+                        <button class="slider-btn" onclick="adjustSlider('compressionRatio', -0.1)">−</button>
+                        <input type="range" id="compressionRatio" min="1" max="3" step="0.1" value="1.4" oninput="updateSliderValue('compressionRatio'); calculateSizing()">
+                        <button class="slider-btn" onclick="adjustSlider('compressionRatio', 0.1)">+</button>
+                    </div>
+                </div>
+                <label>Host Failures to Tolerate (HFT)</label>
+                <select id="hft" onchange="syncHFTandRAID(); calculateSizing()">
+                    <option value="0">FTT0</option>
+                    <option value="1">FTT1</option>
+                    <option value="2" selected>FTT2</option>
+                    <option value="3">FTT3</option>
+                </select>
+                <label>RAID Level</label>
+                <select id="raidLevel" onchange="calculateSizing()">
+                    <option value="0">FTT0</option>
+                    <option value="1">RAID-1</option>
+                    <option value="5">RAID-5</option>
+                    <option value="6">RAID-6</option>
+                </select>
+                <div class="slider-container">
+                    <div class="label-value-container">
+                        <label>Growth Factor (%)</label>
+                        <span id="growthFactorValue" class="slider-value">10</span>
+                    </div>
+                    <div class="slider-control">
+                        <button class="slider-btn" onclick="adjustSlider('growthFactor', -1)">−</button>
+                        <input type="range" id="growthFactor" min="0" max="50" value="10" oninput="updateSliderValue('growthFactor'); calculateSizing()">
+                        <button class="slider-btn" onclick="adjustSlider('growthFactor', 1)">+</button>
+                    </div>
+                </div>
+            </div>
+            <div class="output-panel">
+                <div class="chart-section">
+                    <div class="card">
+                        <div class="chart-container">
+                            <canvas id="computeChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="chart-container">
+                            <canvas id="storageChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="results-utilization">
+                    <div class="card results-section">
+                        <h2>Sizing Results</h2>
+                        <p class="result-text"><strong>Total Hosts:</strong> <span id="totalHosts"></span></p>
+                        <p class="result-text"><strong>Avg VMs per Host:</strong> <span id="vmsPerHost"></span></p>
+                        <p class="result-text"><strong>Avg IOPS per VM:</strong> <span id="avgIOPSPerVM"></span></p>
+                        <p class="result-text"><strong>Total IOPS Required:</strong> <span id="totalIOPS"></span></p>
+                        <p class="result-text"><strong>Total Storage IOPS:</strong> <span id="totalStorageIOPS"></span></p>
+                        <p class="result-text"><strong>Total Storage Required (TB):</strong> <span id="totalStorageRequired"></span></p>
+                        <p class="result-text"><strong>Total Configured Storage (TB):</strong> <span id="totalConfiguredStorage"></span></p>
+                        <p class="result-text"><strong>Total Used Capacity (TB):</strong> <span id="effectiveCapacity"></span></p>
+                        <p class="result-text"><strong>Total Free Storage (TB):</strong> <span id="totalFreeStorage"></span></p>
+                    </div>
+                    <div class="card progress-section">
+                        <h2>Utilization</h2>
+                        <div class="progress-label">CPU Utilization</div>
+                        <div class="progress-bar">
+                            <div id="cpuProgress" class="progress-fill"></div>
+                            <span id="cpuTooltip" class="tooltip"></span>
+                        </div>
+                        <div class="progress-label">Memory Utilization</div>
+                        <div class="progress-bar">
+                            <div id="memoryProgress" class="progress-fill"></div>
+                            <span id="memoryTooltip" class="tooltip"></span>
+                        </div>
+                        <div class="progress-label">Storage Utilization</div>
+                        <div class="progress-bar">
+                            <div id="storageProgress" class="progress-fill"></div>
+                            <span id="storageTooltip" class="tooltip"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card license-section">
+                    <h2>vSAN Add-on Licenses</h2>
+                    <p><span id="licenseRequirement"></span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="help-card" id="helpCard">
+        <h3>How to Use vSAN ESA Handy Sizer</h3>
+        <ol>
+            <li><strong>Set VM Requirements:</strong> Adjust sliders for VMs, IOPS, vCPUs, memory, and capacity per VM.</li>
+            <li><strong>Configure Hosts:</strong> Set hosts, cores, sockets, and max memory via sliders.</li>
+            <li><strong>Define Storage:</strong> Select drive capacity, set slots, compression, and growth factor.</li>
+            <li><strong>Set Fault Tolerance:</strong> Choose HFT (FTT0-FTT3) and RAID level based on HFT rules.</li>
+            <li><strong>Review Outputs:</strong> Check charts, results, utilization (hover for details), and licenses.</li>
+            <li><strong>Watch for Warnings:</strong> Red highlights indicate overprovisioning; adjust as needed.</li>
+        </ol>
+        <button onclick="toggleHelp()">Close</button>
+    </div>
+    <div class="log-card" id="logCard">
+        <h3>Storage Capacity Log</h3>
+        <pre id="storageLog"></pre>
+        <button onclick="toggleLog()">Close</button>
+    </div>
+
+    <script>
+        let computeChart, storageChart;
+
+        function updateSliderValue(id) {
+            const slider = document.getElementById(id);
+            document.getElementById(`${id}Value`).textContent = slider.step < 1 ? parseFloat(slider.value).toFixed(1) : slider.value;
+        }
+
+        function adjustSlider(id, delta) {
+            const slider = document.getElementById(id);
+            const step = parseFloat(slider.step) || 1;
+            let newValue = parseFloat(slider.value) + (delta * step);
+            newValue = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), newValue));
+            slider.value = newValue;
+            updateSliderValue(id);
+            calculateSizing();
+        }
+
+        function syncHFTandRAID() {
+            const hft = parseInt(document.getElementById('hft').value) || 0;
+            const raidSelect = document.getElementById('raidLevel');
+            const options = raidSelect.options;
+
+            for (let i = 0; i < options.length; i++) {
+                options[i].style.display = 'none';
+                options[i].disabled = true;
+            }
+
+            if (hft === 0) {
+                options[0].style.display = 'block';
+                options[0].disabled = false;
+                raidSelect.value = '0';
+            } else if (hft === 1) {
+                options[1].style.display = 'block';
+                options[2].style.display = 'block';
+                options[1].disabled = false;
+                options[2].disabled = false;
+                raidSelect.value = raidSelect.value === '0' || raidSelect.value === '6' ? '1' : raidSelect.value;
+            } else if (hft === 2) {
+                options[1].style.display = 'block';
+                options[3].style.display = 'block';
+                options[1].disabled = false;
+                options[3].disabled = false;
+                raidSelect.value = raidSelect.value === '0' || raidSelect.value === '5' ? '1' : raidSelect.value;
+            } else if (hft === 3) {
+                options[1].style.display = 'block';
+                options[1].disabled = false;
+                raidSelect.value = '1';
+            }
+        }
+
+        function toggleHelp() {
+            const helpCard = document.getElementById('helpCard');
+            helpCard.style.display = helpCard.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function toggleLog() {
+            const logCard = document.getElementById('logCard');
+            logCard.style.display = logCard.style.display === 'block' ? 'none' : 'block';
+            if (logCard.style.display === 'block') calculateSizing(); // Refresh log when opened
+        }
+
+        function calculateSizing() {
+            const numVMs = parseInt(document.getElementById('numVMs').value) || 1;
+            const iopsPerVM = parseFloat(document.getElementById('iopsPerVM').value) || 1;
+            const vcpuPerVM = parseInt(document.getElementById('vcpuPerVM').value) || 1;
+            const memoryPerVM = parseFloat(document.getElementById('memoryPerVM').value) || 1;
+            const capacityPerVM = parseFloat(document.getElementById('capacityPerVM').value) || 1; // GB
+            let numHosts = parseInt(document.getElementById('numHosts').value);
+            const coresPerSocket = parseInt(document.getElementById('coresPerSocket').value) || 1;
+            const socketsPerHost = parseInt(document.getElementById('socketsPerHost').value) || 1;
+            const maxMemory = parseFloat(document.getElementById('maxMemory').value) || 1; // GB
+            const driveCapacity = parseFloat(document.getElementById('driveCapacity').value); // TB
+            const maxDriveSlots = parseInt(document.getElementById('maxDriveSlots').value) || 1;
+            const compressionRatio = parseFloat(document.getElementById('compressionRatio').value);
+            const hft = parseInt(document.getElementById('hft').value) || 0;
+            const raidLevel = document.getElementById('raidLevel').value;
+            const growthFactor = parseFloat(document.getElementById('growthFactor').value) || 0;
+
+            // RAID Overhead
+            let raidOverhead, raidDescription;
+            if (raidLevel === '0') { raidOverhead = 1; raidDescription = "No mirroring or parity (FTT0)"; }
+            else if (raidLevel === '1') { raidOverhead = 2; raidDescription = "Mirroring (RAID-1, 50% capacity used)"; }
+            else if (raidLevel === '5') { raidOverhead = numHosts < 4 ? 1.5 : 1.25; raidDescription = numHosts < 4 ? "Erasure Coding (RAID-5, 2D+1P, 33% parity)" : "Erasure Coding (RAID-5, 4D+1P, 20% parity)"; }
+            else if (raidLevel === '6') { raidOverhead = 1.5; raidDescription = "Erasure Coding (RAID-6, 4D+2P, 33% parity)"; }
+
+            const minClusterSize = raidLevel === '6' ? 6 : (raidLevel === '5' ? (numHosts < 4 ? 3 : 5) : (raidLevel === '1' ? 2 : 1));
+            numHosts = Math.max(numHosts, minClusterSize);
+
+            const coresPerIops = 3.6e-4;
+            const clockSpeed = 2.0;
+            const lsfsOverhead = 0.111; // 11.1% for filesystem
+            const leafOverhead = 0.02; // 2% for leaf structures
+            const metadataOverhead = 0.1; // 10% for system metadata
+            const hostFootprintMB = 10000;
+            const diskFootprintMB = 1000;
+            const systemMemoryOverhead = 0.05;
+            const vcpuPerPcpu = 6;
+            const nvmeIopsPerTB = 150000;
+
+            // CPU Calculations
+            const totalIOPS = numVMs * iopsPerVM;
+            const avgIOPSPerVM = iopsPerVM;
+            const coresConsumedPerIops = (coresPerIops * 2.6) / clockSpeed;
+            const totalCoresConsumedVSAN = coresConsumedPerIops * totalIOPS;
+            const coresPerVM = vcpuPerVM / vcpuPerPcpu;
+            const coresConsumedByApp = numVMs * coresPerVM;
+            const totalCoresConsumed = coresConsumedByApp + totalCoresConsumedVSAN;
+            const totalCoresPerHost = coresPerSocket * socketsPerHost;
+            const totalCores = totalCoresPerHost * numHosts;
+            const freeCores = totalCores - totalCoresConsumed;
+
+            // Storage Calculations (1000 GB = 1 TB)
+            const totalStorageRequired = (numVMs * capacityPerVM) / 1000; // GB to TB using 1000
+            const totalUsedCapacity = numVMs * capacityPerVM * (1 + growthFactor / 100); // GB, includes growth
+            const effectiveUsedCapacity = (totalUsedCapacity * raidOverhead) / compressionRatio; // GB, after RAID and compression
+            const lsfsOverheadTB = effectiveUsedCapacity * lsfsOverhead / 1000; // GB to TB using 1000
+            const leafOverheadTB = effectiveUsedCapacity * leafOverhead / 1000; // GB to TB using 1000
+            const effectiveCapacityWithOverheads = (effectiveUsedCapacity / 1000) + lsfsOverheadTB + leafOverheadTB; // TB
+
+            const rawStoragePerHost = driveCapacity * maxDriveSlots; // TB
+            const metadataOverheadTBPerHost = rawStoragePerHost * metadataOverhead; // TB
+            const operationsReserveGBPerHost = 765 + (100 * maxDriveSlots) + (0.05 * rawStoragePerHost * 1000); // GB (1000-based)
+            const operationsReserveTBPerHost = operationsReserveGBPerHost / 1000; // GB to TB using 1000
+            const usableStoragePerHost = rawStoragePerHost - operationsReserveTBPerHost - metadataOverheadTBPerHost; // TB
+
+            const totalClusterRawCapacity = rawStoragePerHost * numHosts; // TB
+            const totalClusterUsableCapacity = usableStoragePerHost * numHosts; // TB
+            const totalClusterFreeCapacity = totalClusterUsableCapacity - effectiveCapacityWithOverheads; // TB
+            const totalStorageIOPS = rawStoragePerHost * nvmeIopsPerTB * numHosts;
+            const totalConfiguredStorage = totalClusterRawCapacity; // TB
+
+            // Memory Calculations (1000 GB = 1 TB, but kept in GB here)
+            const memoryPerHost = (numVMs * memoryPerVM) / numHosts; // GB
+            const vsanMemoryMB = hostFootprintMB + (maxDriveSlots * diskFootprintMB) + (maxMemory * 1000 * systemMemoryOverhead); // MB (1000-based)
+            const vsanMemoryGB = vsanMemoryMB / 1000; // MB to GB using 1000
+            const totalMemoryRequired = (memoryPerHost * (1 + growthFactor / 100) + vsanMemoryGB) * numHosts; // GB
+            const totalMemory = maxMemory * numHosts; // GB
+            const freeMemory = totalMemory - totalMemoryRequired; // GB
+
+            // vSAN License in TiB (1024-based)
+            const totalRawCapacityTiB = totalClusterRawCapacity * (1000 / 1024); // TB to TiB using 1024
+            const vcfLicensePerCoreTiB = 1;
+            const vcfStorageLicenseTiB = totalCores * vcfLicensePerCoreTiB;
+            const additionalVSANLicenseTiB = Math.max(0, totalRawCapacityTiB - vcfStorageLicenseTiB);
+            const licenseRequirement = additionalVSANLicenseTiB > 0 ? `${Math.ceil(additionalVSANLicenseTiB)} TiB (vSAN Add-on)` : 'No Additional vSAN Licenses Required';
+
+            const finalHosts = numHosts;
+            const finalVMsPerHost = Math.round(numVMs / finalHosts);
+
+            // Utilization
+            const cpuOverprovisioned = totalCoresConsumed > totalCores;
+            const memoryOverprovisioned = totalMemoryRequired > totalMemory;
+            const storageOverprovisioned = effectiveCapacityWithOverheads > totalClusterUsableCapacity;
+
+            const cpuUtilization = Math.min((totalCoresConsumed / totalCores) * 100, 100);
+            const memoryUtilization = Math.min((totalMemoryRequired / totalMemory) * 100, 100);
+            const storageUtilization = Math.min((effectiveCapacityWithOverheads / totalClusterUsableCapacity) * 100, 100);
+
+            document.getElementById('cpuProgress').style.width = `${cpuUtilization}%`;
+            document.getElementById('memoryProgress').style.width = `${memoryUtilization}%`;
+            document.getElementById('storageProgress').style.width = `${storageUtilization}%`;
+            document.getElementById('cpuProgress').style.background = cpuOverprovisioned ? '#dc2626' : '#3b82f6';
+            document.getElementById('memoryProgress').style.background = memoryOverprovisioned ? '#dc2626' : '#3b82f6';
+            document.getElementById('storageProgress').style.background = storageOverprovisioned ? '#dc2626' : '#3b82f6';
+
+            document.getElementById('cpuTooltip').textContent = `Total CPU: ${totalCores.toFixed(2)} Cores\nUtilized: ${totalCoresConsumed.toFixed(2)} Cores\nFree: ${freeCores.toFixed(2)} Cores\nUtilized: ${cpuUtilization.toFixed(2)}%\nFree: ${(100 - cpuUtilization).toFixed(2)}%`;
+            document.getElementById('memoryTooltip').textContent = `Total Memory: ${totalMemory.toFixed(2)} GB\nUtilized: ${totalMemoryRequired.toFixed(2)} GB\nFree: ${freeMemory.toFixed(2)} GB\nUtilized: ${memoryUtilization.toFixed(2)}%\nFree: ${(100 - memoryUtilization).toFixed(2)}%`;
+            document.getElementById('storageTooltip').textContent = `Total Storage: ${totalConfiguredStorage.toFixed(2)} TB\nUtilized: ${effectiveCapacityWithOverheads.toFixed(2)} TB\nFree: ${totalClusterFreeCapacity.toFixed(2)} TB\nUtilized: ${storageUtilization.toFixed(2)}%\nFree: ${(100 - storageUtilization).toFixed(2)}%`;
+
+            document.getElementById('totalHosts').textContent = finalHosts;
+            document.getElementById('vmsPerHost').textContent = finalVMsPerHost;
+            document.getElementById('avgIOPSPerVM').textContent = avgIOPSPerVM.toFixed(2);
+            document.getElementById('totalIOPS').textContent = totalIOPS.toFixed(2);
+            document.getElementById('totalStorageIOPS').textContent = totalStorageIOPS.toFixed(2);
+            document.getElementById('totalStorageRequired').textContent = totalStorageRequired.toFixed(2);
+            document.getElementById('totalConfiguredStorage').textContent = totalConfiguredStorage.toFixed(2);
+            document.getElementById('effectiveCapacity').className = storageOverprovisioned ? 'result-text warning' : 'result-text';
+            document.getElementById('effectiveCapacity').textContent = effectiveCapacityWithOverheads.toFixed(2) + (storageOverprovisioned ? ' (Overprovisioned)' : '');
+            document.getElementById('totalFreeStorage').textContent = totalClusterFreeCapacity.toFixed(2);
+            document.getElementById('licenseRequirement').textContent = licenseRequirement;
+
+            // Storage Log
+            const storageLog = `
+Storage Capacity Breakdown:
+1. Raw Capacity: ${totalClusterRawCapacity.toFixed(2)} TB
+   - Drives: ${driveCapacity} TB x ${maxDriveSlots} slots x ${numHosts} hosts
+
+2. Overheads per Host:
+   - System Metadata: ${metadataOverheadTBPerHost.toFixed(2)} TB (10% of raw per host)
+   - Operations Reserve: ${operationsReserveTBPerHost.toFixed(2)} TB (fixed + drive-based)
+   - Usable per Host: ${usableStoragePerHost.toFixed(2)} TB
+
+3. Total Usable Capacity: ${totalClusterUsableCapacity.toFixed(2)} TB
+   - ${numHosts} hosts x ${usableStoragePerHost.toFixed(2)} TB/host
+
+4. VM Storage Needed: ${totalStorageRequired.toFixed(2)} TB
+   - ${numVMs} VMs x ${capacityPerVM} GB = ${(numVMs * capacityPerVM).toFixed(2)} GB / 1000
+
+5. After Growth (${growthFactor}%): ${(totalUsedCapacity / 1000).toFixed(2)} TB
+   - ${(numVMs * capacityPerVM).toFixed(2)} GB x 1.${growthFactor / 100} / 1000
+
+6. After RAID/Protection: ${(totalUsedCapacity * raidOverhead / 1000).toFixed(2)} TB
+   - ${raidDescription}
+
+7. After Compression (${compressionRatio}x): ${effectiveUsedCapacity.toFixed(2)} GB
+   - ${(totalUsedCapacity * raidOverhead).toFixed(2)} GB / ${compressionRatio}
+
+8. Final Used Capacity: ${effectiveCapacityWithOverheads.toFixed(2)} TB
+   - Base: ${(effectiveUsedCapacity / 1000).toFixed(2)} TB
+   - Filesystem Overhead (11.1%): ${lsfsOverheadTB.toFixed(2)} TB
+   - Leaf Overhead (2%): ${leafOverheadTB.toFixed(2)} TB
+
+9. Free Capacity: ${totalClusterFreeCapacity.toFixed(2)} TB
+   - ${totalClusterUsableCapacity.toFixed(2)} TB - ${effectiveCapacityWithOverheads.toFixed(2)} TB
+`;
+            document.getElementById('storageLog').textContent = storageLog;
+
+            // Charts
+            if (computeChart) computeChart.destroy();
+            const computeCtx = document.getElementById('computeChart').getContext('2d');
+            computeChart = new Chart(computeCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Utilized CPU (Cores)', 'Free CPU (Cores)', 'Utilized Memory (GB)', 'Free Memory (GB)'],
+                    datasets: [{
+                        data: [totalCoresConsumed, Math.max(freeCores, 0), totalMemoryRequired, Math.max(freeMemory, 0)],
+                        backgroundColor: [cpuOverprovisioned ? '#dc2626' : '#3b82f6', '#93c5fd', memoryOverprovisioned ? '#dc2626' : '#22c55e', '#86efac']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 14, weight: '600' } } }, title: { display: true, text: 'Compute Distribution', font: { size: 16, weight: '700' } } } }
+            });
+
+            if (storageChart) storageChart.destroy();
+            const storageCtx = document.getElementById('storageChart').getContext('2d');
+            storageChart = new Chart(storageCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Total Cluster Raw Capacity (TB)', 'Total Usable Capacity (TB)', 'Total Free Capacity (TB)'],
+                    datasets: [{
+                        data: [totalClusterRawCapacity, totalClusterUsableCapacity, Math.max(totalClusterFreeCapacity, 0)],
+                        backgroundColor: [storageOverprovisioned ? '#dc2626' : '#8b5cf6', '#10b981', '#f97316']
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 14, weight: '600' } } }, title: { display: true, text: 'Cluster Storage Distribution (TB)', font: { size: 16, weight: '700' } } } }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            updateSliderValue('numVMs');
+            updateSliderValue('iopsPerVM');
+            updateSliderValue('vcpuPerVM');
+            updateSliderValue('memoryPerVM');
+            updateSliderValue('capacityPerVM');
+            updateSliderValue('numHosts');
+            updateSliderValue('coresPerSocket');
+            updateSliderValue('socketsPerHost');
+            updateSliderValue('maxMemory');
+            updateSliderValue('maxDriveSlots');
+            updateSliderValue('compressionRatio');
+            updateSliderValue('growthFactor');
+            syncHFTandRAID();
+            calculateSizing();
+        });
+    </script>
+</body>
+</html>
+
