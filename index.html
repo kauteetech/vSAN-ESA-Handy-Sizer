@@ -12,6 +12,7 @@
         .container { background: #fff; width: 100%; max-width: 1400px; min-height: calc(100vh - 3rem); display: flex; flex-direction: column; box-shadow: 0 0.25rem 0.5rem rgba(47, 53, 58, 0.1); border-radius: 0.5rem; overflow: hidden; }
         .header { background: #ebedef; padding: 1.5rem; text-align: center; border-bottom: 1px solid #d2d4d6; position: relative; }
         .header h1 { font-size: 1.75rem; font-weight: 700; margin: 0; color: #2f353a; }
+        .toggle-btn { position: absolute; top: 1.5rem; left: 1.5rem; padding: 0.5rem 1rem; background: #3b82f6; color: #fff; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.9rem; font-weight: 600; }
         .help-icon, .log-icon { position: absolute; top: 1.5rem; font-size: 1.5rem; cursor: pointer; color: #3b82f6; }
         .help-icon { right: 1.5rem; }
         .log-icon { right: 3.5rem; }
@@ -49,6 +50,7 @@
         .help-card ol, .log-card pre { font-size: 0.9rem; font-weight: 500; color: #2f353a; padding-left: 1.5rem; }
         .log-card pre { padding: 0; white-space: pre-wrap; }
         .help-card button, .log-card button { margin-top: 1rem; padding: 0.5rem 1rem; background: #3b82f6; color: #fff; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.9rem; font-weight: 600; }
+        .advanced-only { display: none; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
         @media (max-width: 768px) { .main-content { flex-direction: column; padding: 1rem; } .input-panel { width: 100%; max-width: 100%; } .results-utilization { flex-direction: column; align-items: center; } }
         @media (min-width: 960px) { .input-panel { overflow-x: hidden; } }
@@ -57,6 +59,7 @@
 <body>
     <div class="container">
         <div class="header">
+            <button class="toggle-btn" onclick="toggleMode()">Toggle Simple/Advanced</button>
             <h1>vSAN ESA Handy Sizer</h1>
             <span class="log-icon" onclick="toggleLog()">📋</span>
             <span class="help-icon" onclick="toggleHelp()">?</span>
@@ -75,7 +78,7 @@
                         <button class="slider-btn" onclick="adjustSlider('numVMs', 1)">+</button>
                     </div>
                 </div>
-                <div class="slider-container">
+                <div class="slider-container advanced-only">
                     <div class="label-value-container">
                         <label>IOPS per VM</label>
                         <span id="iopsPerVMValue" class="slider-value">500</span>
@@ -86,7 +89,7 @@
                         <button class="slider-btn" onclick="adjustSlider('iopsPerVM', 1)">+</button>
                     </div>
                 </div>
-                <div class="slider-container">
+                <div class="slider-container advanced-only">
                     <div class="label-value-container">
                         <label>vCPU per VM</label>
                         <span id="vcpuPerVMValue" class="slider-value">2</span>
@@ -97,7 +100,7 @@
                         <button class="slider-btn" onclick="adjustSlider('vcpuPerVM', 1)">+</button>
                     </div>
                 </div>
-                <div class="slider-container">
+                <div class="slider-container advanced-only">
                     <div class="label-value-container">
                         <label>Memory per VM (GB)</label>
                         <span id="memoryPerVMValue" class="slider-value">4</span>
@@ -126,11 +129,11 @@
                     </div>
                     <div class="slider-control">
                         <button class="slider-btn" onclick="adjustSlider('numHosts', -1)">−</button>
-                        <input type="range" id="numHosts" min="3" max="64" value="7" oninput="updateSliderValue('numHosts'); calculateSizing()">
+                        <input type="range" id="numHosts" min="3" max="64" value="7" oninput="updateSliderValue('numHosts'); syncHFTandRAID(); calculateSizing()">
                         <button class="slider-btn" onclick="adjustSlider('numHosts', 1)">+</button>
                     </div>
                 </div>
-                <div class="slider-container">
+                <div class="slider-container advanced-only">
                     <div class="label-value-container">
                         <label>Cores per Socket</label>
                         <span id="coresPerSocketValue" class="slider-value">28</span>
@@ -141,7 +144,7 @@
                         <button class="slider-btn" onclick="adjustSlider('coresPerSocket', 1)">+</button>
                     </div>
                 </div>
-                <div class="slider-container">
+                <div class="slider-container advanced-only">
                     <div class="label-value-container">
                         <label>Sockets per Host</label>
                         <span id="socketsPerHostValue" class="slider-value">2</span>
@@ -152,7 +155,7 @@
                         <button class="slider-btn" onclick="adjustSlider('socketsPerHost', 1)">+</button>
                     </div>
                 </div>
-                <div class="slider-container">
+                <div class="slider-container advanced-only">
                     <div class="label-value-container">
                         <label>Max Memory per Host (GB)</label>
                         <span id="maxMemoryValue" class="slider-value">768</span>
@@ -189,7 +192,7 @@
                 <div class="slider-container">
                     <div class="label-value-container">
                         <label>Compression Ratio</label>
-                        <span id="compressionRatioValue" class="slider-value">1.4</span>
+ Specialists <span id="compressionRatioValue" class="slider-value">1.4</span>
                     </div>
                     <div class="slider-control">
                         <button class="slider-btn" onclick="adjustSlider('compressionRatio', -0.1)">−</button>
@@ -222,6 +225,33 @@
                         <button class="slider-btn" onclick="adjustSlider('growthFactor', 1)">+</button>
                     </div>
                 </div>
+                <!-- Advanced VM I/O Profile -->
+                <label class="advanced-only">VM I/O Profile (Read:Write)</label>
+                <select id="ioProfileRW" class="advanced-only" onchange="calculateSizing()">
+                    <option value="10:90">10% Read : 90% Write</option>
+                    <option value="20:80">20% Read : 80% Write</option>
+                    <option value="30:70">30% Read : 70% Write</option>
+                    <option value="40:60">40% Read : 60% Write</option>
+                    <option value="50:50">50% Read : 50% Write</option>
+                    <option value="60:40" selected>60% Read : 40% Write</option>
+                    <option value="70:30">70% Read : 30% Write</option>
+                    <option value="80:20">80% Read : 20% Write</option>
+                    <option value="90:10">90% Read : 10% Write</option>
+                </select>
+                <label class="advanced-only">VM I/O Profile (Block Size)</label>
+                <select id="ioProfileBlock" class="advanced-only" onchange="calculateSizing()">
+                    <option value="4">4KB</option>
+                    <option value="16">16KB</option>
+                    <option value="32">32KB</option>
+                    <option value="64">64KB</option>
+                    <option value="128">128KB</option>
+                    <option value="256">256KB</option>
+                    <option value="512">512KB</option>
+                    <option value="1024">1MB</option>
+                    <option value="4096">4MB</option>
+                    <option value="16384">16MB</option>
+                    <option value="65536">64MB</option>
+                </select>
             </div>
             <div class="output-panel">
                 <div class="chart-section">
@@ -241,9 +271,9 @@
                         <h2>Sizing Results</h2>
                         <p class="result-text"><strong>Total Hosts:</strong> <span id="totalHosts"></span></p>
                         <p class="result-text"><strong>Avg VMs per Host:</strong> <span id="vmsPerHost"></span></p>
-                        <p class="result-text"><strong>Avg IOPS per VM:</strong> <span id="avgIOPSPerVM"></span></p>
-                        <p class="result-text"><strong>Total IOPS Required:</strong> <span id="totalIOPS"></span></p>
-                        <p class="result-text"><strong>Total Storage IOPS:</strong> <span id="totalStorageIOPS"></span></p>
+                        <p class="result-text advanced-only"><strong>Avg IOPS per VM:</strong> <span id="avgIOPSPerVM"></span></p>
+                        <p class="result-text advanced-only"><strong>Total IOPS Required:</strong> <span id="totalIOPS"></span></p>
+                        <p class="result-text advanced-only"><strong>Total Storage IOPS:</strong> <span id="totalStorageIOPS"></span></p>
                         <p class="result-text"><strong>Total Storage Required (TB):</strong> <span id="totalStorageRequired"></span></p>
                         <p class="result-text"><strong>Total Configured Storage (TB):</strong> <span id="totalConfiguredStorage"></span></p>
                         <p class="result-text"><strong>Total Used Capacity (TB):</strong> <span id="effectiveCapacity"></span></p>
@@ -251,13 +281,13 @@
                     </div>
                     <div class="card progress-section">
                         <h2>Utilization</h2>
-                        <div class="progress-label">CPU Utilization</div>
-                        <div class="progress-bar">
+                        <div class="progress-label advanced-only">CPU Utilization</div>
+                        <div class="progress-bar advanced-only">
                             <div id="cpuProgress" class="progress-fill"></div>
                             <span id="cpuTooltip" class="tooltip"></span>
                         </div>
-                        <div class="progress-label">Memory Utilization</div>
-                        <div class="progress-bar">
+                        <div class="progress-label advanced-only">Memory Utilization</div>
+                        <div class="progress-bar advanced-only">
                             <div id="memoryProgress" class="progress-fill"></div>
                             <span id="memoryTooltip" class="tooltip"></span>
                         </div>
@@ -278,23 +308,21 @@
     <div class="help-card" id="helpCard">
         <h3>How to Use vSAN ESA Handy Sizer</h3>
         <ol>
-            <li><strong>Set VM Requirements:</strong> Adjust sliders for VMs, IOPS, vCPUs, memory, and capacity per VM.</li>
-            <li><strong>Configure Hosts:</strong> Set hosts, cores, sockets, and max memory via sliders.</li>
-            <li><strong>Define Storage:</strong> Select drive capacity, set slots, compression, and growth factor.</li>
-            <li><strong>Set Fault Tolerance:</strong> Choose HFT (FTT0-FTT3) and RAID level based on HFT rules.</li>
-            <li><strong>Review Outputs:</strong> Check charts, results, utilization (hover for details), and licenses.</li>
-            <li><strong>Watch for Warnings:</strong> Red highlights indicate overprovisioning; adjust as needed.</li>
+            <li><strong>Simple Mode:</strong> Set VMs, capacity, hosts, drives, RAID for basic sizing.</li>
+            <li><strong>Advanced Mode:</strong> Add IOPS, CPU, memory, and I/O profiles for detailed results.</li>
+            <li><strong>Toggle Mode:</strong> Switch with the top-left button.</li>
+            <li><strong>Review Outputs:</strong> Check charts, results, and log (click 📋).</li>
         </ol>
         <button onclick="toggleHelp()">Close</button>
     </div>
     <div class="log-card" id="logCard">
-        <h3>Storage Capacity Log</h3>
-        <pre id="storageLog"></pre>
+        <h3>Sizing Log</h3>
+        <pre id="sizingLog"></pre>
         <button onclick="toggleLog()">Close</button>
     </div>
 
     <script>
-        let computeChart, storageChart;
+        let computeChart, storageChart, isAdvancedMode = false;
 
         function updateSliderValue(id) {
             const slider = document.getElementById(id);
@@ -308,40 +336,67 @@
             newValue = Math.max(parseFloat(slider.min), Math.min(parseFloat(slider.max), newValue));
             slider.value = newValue;
             updateSliderValue(id);
+            if (id === 'numHosts') syncHFTandRAID();
             calculateSizing();
         }
 
         function syncHFTandRAID() {
             const hft = parseInt(document.getElementById('hft').value) || 0;
+            const numHosts = parseInt(document.getElementById('numHosts').value) || 3;
             const raidSelect = document.getElementById('raidLevel');
             const options = raidSelect.options;
+            let validRaid = raidSelect.value;
 
+            // Hide all options initially
             for (let i = 0; i < options.length; i++) {
                 options[i].style.display = 'none';
                 options[i].disabled = true;
             }
 
+            // vSAN ESA minimum host requirements per RAID and FTT
             if (hft === 0) {
-                options[0].style.display = 'block';
+                options[0].style.display = 'block'; // RAID-0 (FTT0)
                 options[0].disabled = false;
-                raidSelect.value = '0';
+                validRaid = '0';
             } else if (hft === 1) {
-                options[1].style.display = 'block';
-                options[2].style.display = 'block';
-                options[1].disabled = false;
-                options[2].disabled = false;
-                raidSelect.value = raidSelect.value === '0' || raidSelect.value === '6' ? '1' : raidSelect.value;
+                if (numHosts >= 3) {
+                    options[1].style.display = 'block'; // RAID-1 (FTT=1, 3 hosts min)
+                    options[1].disabled = false;
+                    options[2].style.display = 'block'; // RAID-5 (FTT=1, 3 hosts min for 2+1)
+                    options[2].disabled = false;
+                    if (numHosts >= 6 && validRaid === '5') {
+                        // RAID-5 4+1 scheme for 6+ hosts
+                    } else if (validRaid === '6') {
+                        validRaid = '1'; // Reset to RAID-1 if RAID-6 was selected
+                    }
+                }
+                validRaid = validRaid === '0' || validRaid === '6' ? '1' : validRaid;
             } else if (hft === 2) {
-                options[1].style.display = 'block';
-                options[3].style.display = 'block';
-                options[1].disabled = false;
-                options[3].disabled = false;
-                raidSelect.value = raidSelect.value === '0' || raidSelect.value === '5' ? '1' : raidSelect.value;
+                if (numHosts >= 5) {
+                    options[1].style.display = 'block'; // RAID-1 (FTT=2, 5 hosts min)
+                    options[1].disabled = false;
+                }
+                if (numHosts >= 6) {
+                    options[3].style.display = 'block'; // RAID-6 (FTT=2, 6 hosts min)
+                    options[3].disabled = false;
+                }
+                validRaid = (validRaid === '6' && numHosts >= 6) ? '6' : (numHosts >= 5 ? '1' : '1');
             } else if (hft === 3) {
-                options[1].style.display = 'block';
-                options[1].disabled = false;
-                raidSelect.value = '1';
+                if (numHosts >= 7) {
+                    options[1].style.display = 'block'; // RAID-1 (FTT=3, 7 hosts min)
+                    options[1].disabled = false;
+                }
+                validRaid = numHosts >= 7 ? '1' : '1';
             }
+
+            raidSelect.value = validRaid;
+        }
+
+        function toggleMode() {
+            isAdvancedMode = !isAdvancedMode;
+            document.querySelectorAll('.advanced-only').forEach(el => el.style.display = isAdvancedMode ? 'block' : 'none');
+            document.querySelector('.toggle-btn').textContent = isAdvancedMode ? 'Switch to Simple' : 'Switch to Advanced';
+            calculateSizing();
         }
 
         function toggleHelp() {
@@ -352,122 +407,181 @@
         function toggleLog() {
             const logCard = document.getElementById('logCard');
             logCard.style.display = logCard.style.display === 'block' ? 'none' : 'block';
-            if (logCard.style.display === 'block') calculateSizing(); // Refresh log when opened
+            if (logCard.style.display === 'block') calculateSizing();
         }
 
         function calculateSizing() {
+            // --- Input Collection ---
             const numVMs = parseInt(document.getElementById('numVMs').value) || 1;
-            const iopsPerVM = parseFloat(document.getElementById('iopsPerVM').value) || 1;
-            const vcpuPerVM = parseInt(document.getElementById('vcpuPerVM').value) || 1;
-            const memoryPerVM = parseFloat(document.getElementById('memoryPerVM').value) || 1;
+            const iopsPerVM = isAdvancedMode ? parseFloat(document.getElementById('iopsPerVM').value) || 1 : 0;
+            const vcpuPerVM = isAdvancedMode ? parseInt(document.getElementById('vcpuPerVM').value) || 1 : 0;
+            const memoryPerVM = isAdvancedMode ? parseFloat(document.getElementById('memoryPerVM').value) || 1 : 0;
             const capacityPerVM = parseFloat(document.getElementById('capacityPerVM').value) || 1; // GB
             let numHosts = parseInt(document.getElementById('numHosts').value);
-            const coresPerSocket = parseInt(document.getElementById('coresPerSocket').value) || 1;
-            const socketsPerHost = parseInt(document.getElementById('socketsPerHost').value) || 1;
-            const maxMemory = parseFloat(document.getElementById('maxMemory').value) || 1; // GB
-            const driveCapacity = parseFloat(document.getElementById('driveCapacity').value); // TB
+            const coresPerSocket = isAdvancedMode ? parseInt(document.getElementById('coresPerSocket').value) || 1 : 32;
+            const socketsPerHost = isAdvancedMode ? parseInt(document.getElementById('socketsPerHost').value) || 1 : 2;
+            const maxMemory = isAdvancedMode ? parseFloat(document.getElementById('maxMemory').value) || 1 : 768;
+            const driveCapacity = parseFloat(document.getElementById('driveCapacity').value);
             const maxDriveSlots = parseInt(document.getElementById('maxDriveSlots').value) || 1;
             const compressionRatio = parseFloat(document.getElementById('compressionRatio').value);
-            const hft = parseInt(document.getElementById('hft').value) || 0;
-            const raidLevel = document.getElementById('raidLevel').value;
+            let hft = parseInt(document.getElementById('hft').value) || 0;
+            let raidLevel = document.getElementById('raidLevel').value;
             const growthFactor = parseFloat(document.getElementById('growthFactor').value) || 0;
+            const ioProfileRW = isAdvancedMode ? document.getElementById('ioProfileRW').value : '60:40';
+            const ioProfileBlock = isAdvancedMode ? parseInt(document.getElementById('ioProfileBlock').value) : 4;
 
-            // RAID Overhead
-            let raidOverhead, raidDescription;
-            if (raidLevel === '0') { raidOverhead = 1; raidDescription = "No mirroring or parity (FTT0)"; }
-            else if (raidLevel === '1') { raidOverhead = 2; raidDescription = "Mirroring (RAID-1, 50% capacity used)"; }
-            else if (raidLevel === '5') { raidOverhead = numHosts < 4 ? 1.5 : 1.25; raidDescription = numHosts < 4 ? "Erasure Coding (RAID-5, 2D+1P, 33% parity)" : "Erasure Coding (RAID-5, 4D+1P, 20% parity)"; }
-            else if (raidLevel === '6') { raidOverhead = 1.5; raidDescription = "Erasure Coding (RAID-6, 4D+2P, 33% parity)"; }
+            // --- Enforce vSAN ESA Minimum Host Requirements ---
+            let minHostsRequired = 3; // Default minimum for vSAN ESA
+            if (hft === 0) {
+                minHostsRequired = 1;
+            } else if (hft === 1) {
+                minHostsRequired = (raidLevel === '5') ? 3 : 3; // RAID-5 2+1 or RAID-1
+            } else if (hft === 2) {
+                minHostsRequired = (raidLevel === '6') ? 6 : 5; // RAID-6 needs 6, RAID-1 needs 5
+            } else if (hft === 3) {
+                minHostsRequired = 7; // RAID-1 only
+            }
 
-            const minClusterSize = raidLevel === '6' ? 6 : (raidLevel === '5' ? (numHosts < 4 ? 3 : 5) : (raidLevel === '1' ? 2 : 1));
+            if (numHosts < minHostsRequired) {
+                numHosts = minHostsRequired;
+                document.getElementById('numHosts').value = numHosts;
+                updateSliderValue('numHosts');
+            }
+
+            // Adjust RAID and HFT if incompatible
+            if (hft === 2 && raidLevel === '6' && numHosts < 6) {
+                raidLevel = '1'; // Fallback to RAID-1
+                document.getElementById('raidLevel').value = '1';
+            } else if (hft === 1 && raidLevel === '5' && numHosts >= 6) {
+                // RAID-5 switches to 4+1 scheme, no change needed
+            }
+
+            // --- RAID Configuration ---
+            let raidOverhead, raidDescription, writePenalty;
+            if (raidLevel === '0') { 
+                raidOverhead = 1; 
+                raidDescription = "No mirroring or parity (FTT0)"; 
+                writePenalty = 1;
+            } else if (raidLevel === '1') { 
+                raidOverhead = 2; 
+                raidDescription = "Mirroring (RAID-1, 50% capacity used)"; 
+                writePenalty = 2;
+            } else if (raidLevel === '5') { 
+                raidOverhead = numHosts < 6 ? 1.5 : 1.25; 
+                raidDescription = numHosts < 6 ? "Erasure Coding (RAID-5, 2D+1P, 33% parity)" : "Erasure Coding (RAID-5, 4D+1P, 20% parity)"; 
+                writePenalty = numHosts < 6 ? 3 : 4;
+            } else if (raidLevel === '6') { 
+                raidOverhead = 1.5; 
+                raidDescription = "Erasure Coding (RAID-6, 4D+2P, 33% parity)"; 
+                writePenalty = 6;
+            }
+            const minClusterSize = raidLevel === '6' ? 6 : (raidLevel === '5' ? (numHosts < 6 ? 3 : 6) : (raidLevel === '1' ? 3 : 1));
             numHosts = Math.max(numHosts, minClusterSize);
 
-            const coresPerIops = 3.6e-4;
-            const clockSpeed = 2.0;
-            const lsfsOverhead = 0.111; // 11.1% for filesystem
-            const leafOverhead = 0.02; // 2% for leaf structures
-            const metadataOverhead = 0.1; // 10% for system metadata
+            // --- Constants ---
+            const clockSpeed = 2.0; // GHz
+            const lsfsOverhead = 0.111; // 11.1%
+            const leafOverhead = 0.02; // 2%
+            const metadataOverhead = 0.1; // 10%
             const hostFootprintMB = 10000;
             const diskFootprintMB = 1000;
-            const systemMemoryOverhead = 0.05;
-            const vcpuPerPcpu = 6;
-            const nvmeIopsPerTB = 150000;
+            const systemMemoryOverhead = 0.05; // 5%
+            const vcpuPerPcpu = 6; // HT assumed
+            const nvmeIopsPerTB = { 4: 150000, 16: 120000, 32: 100000, 64: 80000, 128: 60000, 256: 40000, 
+                                   512: 20000, 1024: 10000, 4096: 2500, 16384: 625, 65536: 156 };
 
-            // CPU Calculations
-            const totalIOPS = numVMs * iopsPerVM;
-            const avgIOPSPerVM = iopsPerVM;
-            const coresConsumedPerIops = (coresPerIops * 2.6) / clockSpeed;
-            const totalCoresConsumedVSAN = coresConsumedPerIops * totalIOPS;
-            const coresPerVM = vcpuPerVM / vcpuPerPcpu;
-            const coresConsumedByApp = numVMs * coresPerVM;
-            const totalCoresConsumed = coresConsumedByApp + totalCoresConsumedVSAN;
-            const totalCoresPerHost = coresPerSocket * socketsPerHost;
-            const totalCores = totalCoresPerHost * numHosts;
-            const freeCores = totalCores - totalCoresConsumed;
+            // --- I/O Profile Adjustments (Advanced Only) ---
+            let totalIOPS = 0, avgIOPSPerVM = 0, totalStorageIOPS = 0, coresConsumedPerIops = 0;
+            if (isAdvancedMode) {
+                const [readPercent, writePercent] = ioProfileRW.split(':').map(Number);
+                const writeMultiplier = writePenalty * (writePercent / 100);
+                const readMultiplier = readPercent / 100;
+                const ioMultiplier = readMultiplier + writeMultiplier;
+                const blockSizeFactor = 4 / ioProfileBlock;
+                totalIOPS = numVMs * iopsPerVM * ioMultiplier * blockSizeFactor;
+                avgIOPSPerVM = iopsPerVM * ioMultiplier * blockSizeFactor;
+                totalStorageIOPS = driveCapacity * maxDriveSlots * nvmeIopsPerTB[ioProfileBlock] * numHosts;
+                coresConsumedPerIops = (0.0001 * ioMultiplier) / clockSpeed;
+            }
 
-            // Storage Calculations (1000 GB = 1 TB)
-            const totalStorageRequired = (numVMs * capacityPerVM) / 1000; // GB to TB using 1000
-            const totalUsedCapacity = numVMs * capacityPerVM * (1 + growthFactor / 100); // GB, includes growth
-            const effectiveUsedCapacity = (totalUsedCapacity * raidOverhead) / compressionRatio; // GB, after RAID and compression
-            const lsfsOverheadTB = effectiveUsedCapacity * lsfsOverhead / 1000; // GB to TB using 1000
-            const leafOverheadTB = effectiveUsedCapacity * leafOverhead / 1000; // GB to TB using 1000
-            const effectiveCapacityWithOverheads = (effectiveUsedCapacity / 1000) + lsfsOverheadTB + leafOverheadTB; // TB
+            // --- CPU Calculations (Advanced Only) ---
+            let totalCoresConsumed = 0, totalCores = 0, freeCores = 0;
+            if (isAdvancedMode) {
+                const totalCoresConsumedVSAN = coresConsumedPerIops * totalIOPS;
+                const coresPerVM = vcpuPerVM / vcpuPerPcpu;
+                const coresConsumedByApp = numVMs * coresPerVM;
+                totalCoresConsumed = coresConsumedByApp + totalCoresConsumedVSAN;
+                const totalCoresPerHost = coresPerSocket * socketsPerHost;
+                totalCores = totalCoresPerHost * numHosts;
+                freeCores = totalCores - totalCoresConsumed;
+            }
 
-            const rawStoragePerHost = driveCapacity * maxDriveSlots; // TB
-            const metadataOverheadTBPerHost = rawStoragePerHost * metadataOverhead; // TB
-            const operationsReserveGBPerHost = 765 + (100 * maxDriveSlots) + (0.05 * rawStoragePerHost * 1000); // GB (1000-based)
-            const operationsReserveTBPerHost = operationsReserveGBPerHost / 1000; // GB to TB using 1000
-            const usableStoragePerHost = rawStoragePerHost - operationsReserveTBPerHost - metadataOverheadTBPerHost; // TB
+            // --- Storage Calculations ---
+            const totalStorageRequired = (numVMs * capacityPerVM) / 1000; // GB to TB
+            const totalUsedCapacity = numVMs * capacityPerVM * (1 + growthFactor / 100); // GB with growth
+            const effectiveUsedCapacity = (totalUsedCapacity * raidOverhead) / compressionRatio; // GB
+            const lsfsOverheadTB = effectiveUsedCapacity * lsfsOverhead / 1000;
+            const leafOverheadTB = effectiveUsedCapacity * leafOverhead / 1000;
+            const effectiveCapacityWithOverheads = (effectiveUsedCapacity / 1000) + lsfsOverheadTB + leafOverheadTB;
 
-            const totalClusterRawCapacity = rawStoragePerHost * numHosts; // TB
-            const totalClusterUsableCapacity = usableStoragePerHost * numHosts; // TB
-            const totalClusterFreeCapacity = totalClusterUsableCapacity - effectiveCapacityWithOverheads; // TB
-            const totalStorageIOPS = rawStoragePerHost * nvmeIopsPerTB * numHosts;
-            const totalConfiguredStorage = totalClusterRawCapacity; // TB
+            const rawStoragePerHost = driveCapacity * maxDriveSlots;
+            const metadataOverheadTBPerHost = rawStoragePerHost * metadataOverhead;
+            const operationsReserveGBPerHost = 765 + (100 * maxDriveSlots) + (0.05 * rawStoragePerHost * 1000);
+            const operationsReserveTBPerHost = operationsReserveGBPerHost / 1000;
+            const usableStoragePerHost = rawStoragePerHost - operationsReserveTBPerHost - metadataOverheadTBPerHost;
 
-            // Memory Calculations (1000 GB = 1 TB, but kept in GB here)
-            const memoryPerHost = (numVMs * memoryPerVM) / numHosts; // GB
-            const vsanMemoryMB = hostFootprintMB + (maxDriveSlots * diskFootprintMB) + (maxMemory * 1000 * systemMemoryOverhead); // MB (1000-based)
-            const vsanMemoryGB = vsanMemoryMB / 1000; // MB to GB using 1000
-            const totalMemoryRequired = (memoryPerHost * (1 + growthFactor / 100) + vsanMemoryGB) * numHosts; // GB
-            const totalMemory = maxMemory * numHosts; // GB
-            const freeMemory = totalMemory - totalMemoryRequired; // GB
+            const totalClusterRawCapacity = rawStoragePerHost * numHosts;
+            const totalClusterUsableCapacity = usableStoragePerHost * numHosts;
+            const totalClusterFreeCapacity = totalClusterUsableCapacity - effectiveCapacityWithOverheads;
+            const totalConfiguredStorage = totalClusterRawCapacity;
+            const totalOverheadCapacity = totalClusterRawCapacity - totalClusterUsableCapacity;
 
-            // vSAN License in TiB (1024-based)
-            const totalRawCapacityTiB = totalClusterRawCapacity * (1000 / 1024); // TB to TiB using 1024
+            // --- Memory Calculations (Advanced Only) ---
+            let totalMemoryRequired = 0, totalMemory = 0, freeMemory = 0;
+            if (isAdvancedMode) {
+                const memoryPerHost = (numVMs * memoryPerVM) / numHosts;
+                const vsanMemoryMB = hostFootprintMB + (maxDriveSlots * diskFootprintMB) + (maxMemory * 1000 * systemMemoryOverhead);
+                const vsanMemoryGB = vsanMemoryMB / 1000;
+                totalMemoryRequired = (memoryPerHost * (1 + growthFactor / 100) + vsanMemoryGB) * numHosts;
+                totalMemory = maxMemory * numHosts;
+                freeMemory = totalMemory - totalMemoryRequired;
+            }
+
+            // --- License Calculation ---
+            const totalRawCapacityTiB = totalClusterRawCapacity * (1000 / 1024);
             const vcfLicensePerCoreTiB = 1;
             const vcfStorageLicenseTiB = totalCores * vcfLicensePerCoreTiB;
             const additionalVSANLicenseTiB = Math.max(0, totalRawCapacityTiB - vcfStorageLicenseTiB);
             const licenseRequirement = additionalVSANLicenseTiB > 0 ? `${Math.ceil(additionalVSANLicenseTiB)} TiB (vSAN Add-on)` : 'No Additional vSAN Licenses Required';
 
+            // --- Utilization ---
             const finalHosts = numHosts;
             const finalVMsPerHost = Math.round(numVMs / finalHosts);
-
-            // Utilization
-            const cpuOverprovisioned = totalCoresConsumed > totalCores;
-            const memoryOverprovisioned = totalMemoryRequired > totalMemory;
+            const cpuOverprovisioned = isAdvancedMode && totalCoresConsumed > totalCores;
+            const memoryOverprovisioned = isAdvancedMode && totalMemoryRequired > totalMemory;
             const storageOverprovisioned = effectiveCapacityWithOverheads > totalClusterUsableCapacity;
 
-            const cpuUtilization = Math.min((totalCoresConsumed / totalCores) * 100, 100);
-            const memoryUtilization = Math.min((totalMemoryRequired / totalMemory) * 100, 100);
+            const cpuUtilization = isAdvancedMode ? Math.min((totalCoresConsumed / totalCores) * 100, 100) : 0;
+            const memoryUtilization = isAdvancedMode ? Math.min((totalMemoryRequired / totalMemory) * 100, 100) : 0;
             const storageUtilization = Math.min((effectiveCapacityWithOverheads / totalClusterUsableCapacity) * 100, 100);
 
-            document.getElementById('cpuProgress').style.width = `${cpuUtilization}%`;
-            document.getElementById('memoryProgress').style.width = `${memoryUtilization}%`;
+            if (isAdvancedMode) {
+                document.getElementById('cpuProgress').style.width = `${cpuUtilization}%`;
+                document.getElementById('memoryProgress').style.width = `${memoryUtilization}%`;
+            }
             document.getElementById('storageProgress').style.width = `${storageUtilization}%`;
-            document.getElementById('cpuProgress').style.background = cpuOverprovisioned ? '#dc2626' : '#3b82f6';
-            document.getElementById('memoryProgress').style.background = memoryOverprovisioned ? '#dc2626' : '#3b82f6';
+            if (isAdvancedMode) {
+                document.getElementById('cpuProgress').style.background = cpuOverprovisioned ? '#dc2626' : '#3b82f6';
+                document.getElementById('memoryProgress').style.background = memoryOverprovisioned ? '#dc2626' : '#3b82f6';
+            }
             document.getElementById('storageProgress').style.background = storageOverprovisioned ? '#dc2626' : '#3b82f6';
 
-            document.getElementById('cpuTooltip').textContent = `Total CPU: ${totalCores.toFixed(2)} Cores\nUtilized: ${totalCoresConsumed.toFixed(2)} Cores\nFree: ${freeCores.toFixed(2)} Cores\nUtilized: ${cpuUtilization.toFixed(2)}%\nFree: ${(100 - cpuUtilization).toFixed(2)}%`;
-            document.getElementById('memoryTooltip').textContent = `Total Memory: ${totalMemory.toFixed(2)} GB\nUtilized: ${totalMemoryRequired.toFixed(2)} GB\nFree: ${freeMemory.toFixed(2)} GB\nUtilized: ${memoryUtilization.toFixed(2)}%\nFree: ${(100 - memoryUtilization).toFixed(2)}%`;
-            document.getElementById('storageTooltip').textContent = `Total Storage: ${totalConfiguredStorage.toFixed(2)} TB\nUtilized: ${effectiveCapacityWithOverheads.toFixed(2)} TB\nFree: ${totalClusterFreeCapacity.toFixed(2)} TB\nUtilized: ${storageUtilization.toFixed(2)}%\nFree: ${(100 - storageUtilization).toFixed(2)}%`;
-
+            // --- Output Updates ---
             document.getElementById('totalHosts').textContent = finalHosts;
             document.getElementById('vmsPerHost').textContent = finalVMsPerHost;
-            document.getElementById('avgIOPSPerVM').textContent = avgIOPSPerVM.toFixed(2);
-            document.getElementById('totalIOPS').textContent = totalIOPS.toFixed(2);
-            document.getElementById('totalStorageIOPS').textContent = totalStorageIOPS.toFixed(2);
+            document.getElementById('avgIOPSPerVM').textContent = isAdvancedMode ? avgIOPSPerVM.toFixed(2) : 'N/A';
+            document.getElementById('totalIOPS').textContent = isAdvancedMode ? totalIOPS.toFixed(2) : 'N/A';
+            document.getElementById('totalStorageIOPS').textContent = isAdvancedMode ? totalStorageIOPS.toFixed(2) : 'N/A';
             document.getElementById('totalStorageRequired').textContent = totalStorageRequired.toFixed(2);
             document.getElementById('totalConfiguredStorage').textContent = totalConfiguredStorage.toFixed(2);
             document.getElementById('effectiveCapacity').className = storageOverprovisioned ? 'result-text warning' : 'result-text';
@@ -475,55 +589,62 @@
             document.getElementById('totalFreeStorage').textContent = totalClusterFreeCapacity.toFixed(2);
             document.getElementById('licenseRequirement').textContent = licenseRequirement;
 
-            // Storage Log
-            const storageLog = `
+            if (isAdvancedMode) {
+                document.getElementById('cpuTooltip').textContent = `Total CPU: ${totalCores.toFixed(2)} Cores\nUtilized: ${totalCoresConsumed.toFixed(2)} Cores\nFree: ${freeCores.toFixed(2)} Cores\nUtilized: ${cpuUtilization.toFixed(2)}%\nFree: ${(100 - cpuUtilization).toFixed(2)}%`;
+                document.getElementById('memoryTooltip').textContent = `Total Memory: ${totalMemory.toFixed(2)} GB\nUtilized: ${totalMemoryRequired.toFixed(2)} GB\nFree: ${freeMemory.toFixed(2)} GB\nUtilized: ${memoryUtilization.toFixed(2)}%\nFree: ${(100 - memoryUtilization).toFixed(2)}%`;
+            }
+            document.getElementById('storageTooltip').textContent = `Total Usable Storage: ${totalClusterUsableCapacity.toFixed(2)} TB\nUtilized: ${effectiveCapacityWithOverheads.toFixed(2)} TB\nFree: ${totalClusterFreeCapacity.toFixed(2)} TB\nUtilized: ${storageUtilization.toFixed(2)}%\nFree: ${(100 - storageUtilization).toFixed(2)}%`;
+
+            // --- Log Output ---
+            let sizingLog = `
 Storage Capacity Breakdown:
 1. Raw Capacity: ${totalClusterRawCapacity.toFixed(2)} TB
    - Drives: ${driveCapacity} TB x ${maxDriveSlots} slots x ${numHosts} hosts
-
 2. Overheads per Host:
-   - System Metadata: ${metadataOverheadTBPerHost.toFixed(2)} TB (10% of raw per host)
-   - Operations Reserve: ${operationsReserveTBPerHost.toFixed(2)} TB (fixed + drive-based)
+   - System Metadata: ${metadataOverheadTBPerHost.toFixed(2)} TB (10%)
+   - Operations Reserve: ${operationsReserveTBPerHost.toFixed(2)} TB
    - Usable per Host: ${usableStoragePerHost.toFixed(2)} TB
-
-3. Total Usable Capacity: ${totalClusterUsableCapacity.toFixed(2)} TB
-   - ${numHosts} hosts x ${usableStoragePerHost.toFixed(2)} TB/host
-
+3. Total Usable Capacity (Post-RAID): ${totalClusterUsableCapacity.toFixed(2)} TB
 4. VM Storage Needed: ${totalStorageRequired.toFixed(2)} TB
-   - ${numVMs} VMs x ${capacityPerVM} GB = ${(numVMs * capacityPerVM).toFixed(2)} GB / 1000
-
 5. After Growth (${growthFactor}%): ${(totalUsedCapacity / 1000).toFixed(2)} TB
-   - ${(numVMs * capacityPerVM).toFixed(2)} GB x 1.${growthFactor / 100} / 1000
-
-6. After RAID/Protection: ${(totalUsedCapacity * raidOverhead / 1000).toFixed(2)} TB
+6. After RAID: ${(totalUsedCapacity * raidOverhead / 1000).toFixed(2)} TB
    - ${raidDescription}
-
 7. After Compression (${compressionRatio}x): ${effectiveUsedCapacity.toFixed(2)} GB
-   - ${(totalUsedCapacity * raidOverhead).toFixed(2)} GB / ${compressionRatio}
-
 8. Final Used Capacity: ${effectiveCapacityWithOverheads.toFixed(2)} TB
-   - Base: ${(effectiveUsedCapacity / 1000).toFixed(2)} TB
-   - Filesystem Overhead (11.1%): ${lsfsOverheadTB.toFixed(2)} TB
-   - Leaf Overhead (2%): ${leafOverheadTB.toFixed(2)} TB
-
 9. Free Capacity: ${totalClusterFreeCapacity.toFixed(2)} TB
-   - ${totalClusterUsableCapacity.toFixed(2)} TB - ${effectiveCapacityWithOverheads.toFixed(2)} TB
 `;
-            document.getElementById('storageLog').textContent = storageLog;
+            if (numHosts > document.getElementById('numHosts').value) {
+                sizingLog += `\nWARNING: Number of hosts increased to ${numHosts} to meet vSAN ESA minimum requirements for HFT=${hft} and RAID=${raidLevel}.`;
+            }
+            if (isAdvancedMode) {
+                sizingLog += `
+IOPS Breakdown:
+1. Base IOPS: ${(numVMs * iopsPerVM).toFixed(2)}
+2. After I/O Profile (${ioProfileRW}, ${ioProfileBlock}KB): ${totalIOPS.toFixed(2)}
+3. Storage IOPS Capacity: ${totalStorageIOPS.toFixed(2)}
 
-            // Charts
+CPU Breakdown:
+1. VM CPU: ${(numVMs * vcpuPerVM / vcpuPerPcpu).toFixed(2)} cores
+2. vSAN CPU: ${(coresConsumedPerIops * totalIOPS).toFixed(2)} cores
+3. Total CPU: ${totalCoresConsumed.toFixed(2)} cores
+   - Out of ${totalCores} cores
+`;
+            }
+            document.getElementById('sizingLog').textContent = sizingLog;
+
+            // --- Charts ---
             if (computeChart) computeChart.destroy();
             const computeCtx = document.getElementById('computeChart').getContext('2d');
             computeChart = new Chart(computeCtx, {
                 type: 'pie',
                 data: {
-                    labels: ['Utilized CPU (Cores)', 'Free CPU (Cores)', 'Utilized Memory (GB)', 'Free Memory (GB)'],
+                    labels: isAdvancedMode ? ['Utilized CPU (Cores)', 'Free CPU (Cores)', 'Utilized Memory (GB)', 'Free Memory (GB)'] : ['Cluster Raw Capacity (TB)', 'Overhead (TB)', 'VM Used Capacity (TB)', 'Free Capacity (TB)'],
                     datasets: [{
-                        data: [totalCoresConsumed, Math.max(freeCores, 0), totalMemoryRequired, Math.max(freeMemory, 0)],
-                        backgroundColor: [cpuOverprovisioned ? '#dc2626' : '#3b82f6', '#93c5fd', memoryOverprovisioned ? '#dc2626' : '#22c55e', '#86efac']
+                        data: isAdvancedMode ? [totalCoresConsumed, Math.max(freeCores, 0), totalMemoryRequired, Math.max(freeMemory, 0)] : [totalClusterRawCapacity, totalOverheadCapacity, effectiveCapacityWithOverheads, Math.max(totalClusterFreeCapacity, 0)],
+                        backgroundColor: isAdvancedMode ? [cpuOverprovisioned ? '#dc2626' : '#3b82f6', '#93c5fd', memoryOverprovisioned ? '#dc2626' : '#22c55e', '#86efac'] : ['#8b5cf6', '#d1d5db', storageOverprovisioned ? '#dc2626' : '#10b981', '#f97316']
                     }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 14, weight: '600' } } }, title: { display: true, text: 'Compute Distribution', font: { size: 16, weight: '700' } } } }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, title: { display: true, text: isAdvancedMode ? 'Compute Distribution' : 'Cluster Storage Distribution (TB)', font: { size: 16, weight: '700' } } } }
             });
 
             if (storageChart) storageChart.destroy();
@@ -531,13 +652,13 @@ Storage Capacity Breakdown:
             storageChart = new Chart(storageCtx, {
                 type: 'pie',
                 data: {
-                    labels: ['Total Cluster Raw Capacity (TB)', 'Total Usable Capacity (TB)', 'Total Free Capacity (TB)'],
+                    labels: ['Cluster Raw Capacity (TB)', 'Total Usable Capacity (Post-RAID, TB)', 'Free Capacity (Post-VM, TB)'],
                     datasets: [{
                         data: [totalClusterRawCapacity, totalClusterUsableCapacity, Math.max(totalClusterFreeCapacity, 0)],
                         backgroundColor: [storageOverprovisioned ? '#dc2626' : '#8b5cf6', '#10b981', '#f97316']
                     }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 14, weight: '600' } } }, title: { display: true, text: 'Cluster Storage Distribution (TB)', font: { size: 16, weight: '700' } } } }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Cluster Storage Distribution (TB)', font: { size: 16, weight: '700' } } } }
             });
         }
 
@@ -560,4 +681,3 @@ Storage Capacity Breakdown:
     </script>
 </body>
 </html>
-
